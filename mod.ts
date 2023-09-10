@@ -1,1 +1,1 @@
-export default 'Module in dev'
+export default 'Module in dev' 
