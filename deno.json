@@ -1,6 +1,6 @@
 {
-    "tasks": {
-        "test": "deno run test.ts",
-        "publish": "deno fmt && deno lint && git push -u origin main --tags"
-    }
+  "tasks": {
+    "test": "deno run test.ts",
+    "publish": "deno fmt && deno lint && git push -u origin main --tags"
+  }
 }
