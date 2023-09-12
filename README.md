@@ -2,9 +2,9 @@
 `json_db` is a simple way to create databases using JSON instead of MongoDB, Sqlite, etc...\
 The syntax is like mongoose...
 
-# Example
+## Example
 ```ts
-import { createDB, SchemaType } from 'https://deno.land/x/json_db@0.0.1/mod.ts';
+import { createDB, SchemaType } from 'https://deno.land/x/json_db@0.0.2/mod.ts';
 
 interface Staff {
     name?: string;

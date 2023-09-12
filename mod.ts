@@ -59,23 +59,33 @@ export class Database<schema> {
      */
     findOne (object: schema): schema | null {
         let result = null;
+        let _id: any = 0;
 
         for (const doc of this.#db) {
-            Object.entries(doc).forEach(([k, v]) => {
+            Object.entries(doc).forEach(([k, v], id) => {
+                _id = id;
                 Object.entries(object as any).forEach(([k_, v_]) => {
                     if (k === k_ && v === v_) result = doc;
                 });
             });
         }
 
-        return result;
+        return typeOf(result) === 'object' ? Object.assign({ _id }, result) : result;
     }
 
     /***
-     * Create a new document in the database
+     * Create a new document in the database\
+     * Alias of `createOne`
      */
     new (object: schema) {
-        Object.entries(object as any).forEach(([k, v]) => {
+        this.createOne(object)
+    }
+
+    /***
+     * Creates a new document in the database
+     */
+    createOne (object: schema) {
+            Object.entries(object as any).forEach(([k, v]) => {
             const schema_ = this.#schema[k];
             const parser = (parsers as any)[SchemaType[schema_.type].toLowerCase()];
             parser(v);
@@ -85,6 +95,23 @@ export class Database<schema> {
 
         doc ? 0 : this.#db.push(object);
         this.#updateFile();
+    }
+
+    /***
+     * Finds, and update if it exists
+     */
+    findOneAndUpdate (oldObject: schema, newObject: schema) {
+        const doc: any = this.findOne(oldObject);
+        if (doc !== null) {
+            Object.entries(newObject as any).forEach(([k, v]) => {
+                const schema_ = this.#schema[k];
+                const parser = (parsers as any)[SchemaType[schema_.type].toLowerCase()];
+                parser(v);
+            });
+    
+            this.#db[doc._id - 1] = newObject;
+            this.#updateFile();
+        }
     }
 
     /***
@@ -100,10 +127,23 @@ export class Database<schema> {
         return schema;
     }
 
+    /***
+     * Returns the last document
+     */
+    last (): schema | null{
+        const num = this.lenght - 1;
+        if (num < 0) error('Cannot of find the last document, the database is blank');
+        return this.#db[num] ?? null;
+    }
 
+    /***
+     * Returns the first document
+     */
+    first (): schema | null {
+        return this.#db[0] ?? null;
+    }
 
     #updateFile: () => void;
-
     #db: any[];
     #schema: any;
     lenght: number;
