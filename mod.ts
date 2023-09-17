@@ -1,167 +1,136 @@
-// I'm a begginer on Deno, literally this is my first module so if there's a error, you can contact me and fix that error
 // deno-lint-ignore-file no-explicit-any
-import { existsSync } from "https://deno.land/std@0.201.0/fs/mod.ts";
-import { CreateOptions, SchemaType } from "./types.ts";
-import { error, parsers, typeOf } from "./util.ts";
-
-export class Database<schema> {
-  /***
-   * Creates a new JSON Database\
-   * Requires `allow-read` and `allow-write` permission
-   */
-  constructor(options: CreateOptions<schema>) {
-    if (!options) error("The options are required to create a JSON Database");
-    if (typeof options.name !== "string") {
-      error(`Expected "string" but got "${typeOf(options.name)}"`);
-    }
-    if (!options.schema) error('The "schema" option is required');
-
-    const path = options.path ?? `${Deno.cwd()}/databases/${options.name}.json`;
-    const schema: any = options.schema;
-
-    if (!existsSync(path)) {
-      if (!options.path) {
-        Deno.mkdirSync(`${Deno.cwd()}/databases`, { recursive: true });
-        Deno.writeTextFileSync(path, `{"${options.name}":[]}`);
-      } else error(`The file "${path}" does not exists`);
-    }
-
-    Object.entries(options.schema).forEach(([key, value]) => {
-      const v: any = value;
-      schema[key] = {
-        type: v.type ?? 4,
-        required: v.required ?? false,
-      };
-    });
-
-    let src_code: string;
-    try {
-      src_code = Deno.readTextFileSync(path);
-    } catch {
-      Deno.writeTextFileSync(path, `{"${options.name}":[]}`);
-      src_code = Deno.readTextFileSync(path);
-    }
-
-    this.#schema = schema;
-    this.#updateFile = () => {
-      const obj: any = {};
-      obj[options.name] = this.#db;
-      Deno.writeTextFileSync(path, JSON.stringify(obj));
-    };
-    this.#db = JSON.parse(src_code)[options.name];
-    this.lenght = this.#db.length;
-
-    return this;
-  }
-
-  /***
-   * Finds, and returns an object if it exits\
-   * If the reference is duplicated returns the latest document
-   */
-  findOne(object: schema): schema | null {
-    let result = null;
-    let _id: any = 0;
-
-    for (const doc of this.#db) {
-      Object.entries(doc).forEach(([k, v], id) => {
-        _id = id;
-        Object.entries(object as any).forEach(([k_, v_]) => {
-          if (k === k_ && v === v_) result = doc;
-        });
-      });
-    }
-
-    return typeOf(result) === "object"
-      ? Object.assign({ _id }, result)
-      : result;
-  }
-
-  /***
-   * Create a new document in the database\
-   * Alias of `createOne`
-   */
-  new(object: schema) {
-    this.createOne(object);
-  }
-
-  /***
-   * Creates a new document in the database
-   */
-  createOne(object: schema) {
-    Object.entries(object as any).forEach(([k, v]) => {
-      const schema_ = this.#schema[k];
-      const parser = (parsers as any)[SchemaType[schema_.type].toLowerCase()];
-      parser(v);
-    });
-
-    const doc = this.findOne(object);
-
-    doc ? 0 : this.#db.push(object);
-    this.#updateFile();
-  }
-
-  /***
-   * Finds, and update if it exists
-   */
-  findOneAndUpdate(oldObject: schema, newObject: schema) {
-    const doc: any = this.findOne(oldObject);
-    if (doc !== null) {
-      Object.entries(newObject as any).forEach(([k, v]) => {
-        const schema_ = this.#schema[k];
-        const parser = (parsers as any)[SchemaType[schema_.type].toLowerCase()];
-        parser(v);
-      });
-
-      this.#db[doc._id - 1] = newObject;
-      this.#updateFile();
-    }
-  }
-
-  /***
-   * Returns a map
-   */
-  map(callback: (object: schema) => unknown): schema[] {
-    const schema: schema[] = [];
-
-    for (const doc of this.#db) {
-      schema.push(callback(doc) as any);
-    }
-
-    return schema;
-  }
-
-  /***
-   * Returns the last document
-   */
-  last(): schema | null {
-    const num = this.lenght - 1;
-    if (num < 0) {
-      error("Cannot of find the last document, the database is blank");
-    }
-    return this.#db[num] ?? null;
-  }
-
-  /***
-   * Returns the first document
-   */
-  first(): schema | null {
-    return this.#db[0] ?? null;
-  }
-
-  #updateFile: () => void;
-  #db: any[];
-  #schema: any;
-  lenght: number;
-}
+import { existsSync } from 'https://deno.land/std@0.201.0/fs/exists.ts';
+import { CreateDabaseOptions, SchemaType } from './types.ts';
+import { error, parsers as _ } from './util.ts';
 
 /***
- * Creates a new JSON Database\
- * Requires `allow-read` and `allow-write` permission
+ * Creates a new Database
  */
-export function createDB<schema>(options: CreateOptions<schema>) {
-  if (new.target) error('"createDB" is not a NewableFunction');
-  return new Database<schema>(options);
+export class Database<T> {
+    constructor (options: CreateDabaseOptions<T>) {
+        if (!options.name || !options.schema) error('Invalid Database options', 'DatabaseError');
+        const path = options?.path ?? `${Deno.cwd()}/db/${options.name}.json`;
+        const schema: any = options.schema;
+        Object.entries(schema).forEach(([k, v]) => {
+            schema[k] = {
+                required: v ?? !1,
+                type: v ?? SchemaType.Any
+            }
+        });
+        this.#schema = schema;
+        if (!options.path && !existsSync(path)) {
+            Deno.mkdirSync(`${Deno.cwd()}/db`);
+            Deno.writeTextFileSync(path, `{"${options.name}": []}`)
+        }
+        this.toJSON = () => {
+            const obj: any = {};
+            obj[options.name] = this.#db;
+            return obj;
+        }
+        this.#save = () => {
+            const obj = this.toJSON()
+            Deno.writeTextFileSync(path, JSON.stringify(obj));
+        };
+        this.#db = JSON.parse(Deno.readTextFileSync(path))[options.name];
+        this.length = this.#db.length;
+    }
+    /***
+     * Finds, and returns a document\
+     * If not exists returns null
+     */
+    findOne (object: T): null | T {
+        let document = null;
+        if (this.length > 0) {
+            for (const doc of this.#db) {
+                Object.entries(doc).forEach(([k, v]) => {
+                    Object.entries(object as any).forEach(([k_, v_]) => {
+                        if (k_ === k && v === v_) document = doc;
+                    })
+                })
+            }
+        }
+        return document;
+    }
+    /***
+     * Finds, and update a document
+     */
+    findOneAndUpdate (oldObject: T, newObject: T) {
+        const doc = this.findOne(oldObject);
+        if (doc !== null) {
+            const index = this.#db.indexOf(doc);
+            if (index >= 0) {
+                this.#db[index] = newObject;
+                this.#save();
+            }
+        }
+    }
+    /***
+     * Clear all the documents
+     */
+    clear () {
+        this.#db = [];
+        this.#save();
+    }
+    /***
+     * Returns if the document exists
+     */
+    has (object: T) {
+        return this.findOne(object) !== null;
+    }
+    /***
+     * Returns a map
+     */
+    map (callbackfn: (value: T, index: number, array: T[]) => unknown, thisArg?: any): T[] {
+        return this.#db.map(callbackfn, thisArg)
+    }
+    /***
+     * Returns the last document
+     */
+    last (): T | null {
+        return this.#db[this.length - 1] ?? null;
+    }
+    /***
+     * Returns the first document
+     */
+    first (): T | null {
+        return this.#db[0] ?? null;
+    }
+    /***
+     * Creates a new document\
+     * Alias of `createOne`
+    */
+    new (object: T) {
+        this.createOne(object)
+    }
+    /***
+     * Creates a new document
+    */
+    createOne (object: T) {
+        const doc = this.findOne(object);
+        if (doc === null) {
+            this.#db.push(object)
+            this.#save()
+        }
+    }
+    /***
+     * Creates more than one document
+    */
+    create (...objects: T[]) {
+        for (const obj of objects) {
+            this.createOne(obj);
+        }
+    }
+    /***
+     * Returns the database but in JSON
+     */
+    toJSON: () => any;
+    #save: () => void;
+    #db: any;
+    length: number;
+    #schema: any;
 }
-
+export function createDB<T> (options: CreateDabaseOptions<T>) {
+    if (new.target) error('"createDB" is not a NewableFunction');
+    return new Database(options)
+}
 export default createDB;
-export * from "./types.ts";

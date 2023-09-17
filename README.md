@@ -1,13 +1,11 @@
 # JSON DB
 
-`json_db` is a simple way to create databases using JSON instead of MongoDB,
-Sqlite, etc...\
-The syntax is like mongoose...
+`json_db` is a simple way to create databases using JSON\
 
 ## Example
 
 ```ts
-import { createDB, SchemaType } from "https://deno.land/x/json_db@0.0.2/mod.ts";
+import { createDB, SchemaType } from "https://deno.land/x/json_db@0.0.3/mod.ts";
 
 interface Staff {
   name?: string;
@@ -19,15 +17,16 @@ const db = createDB<Staff>({
   schema: {
     name: {
       type: SchemaType.String,
-      required: false, // "required" doesn't work yet
+      required: false,
     },
     id: {
       type: SchemaType.String,
-      required: true, // "required" doesn't work yet
+      required: true,
     },
   },
 }); // Creates "databases/staff.json" in the workspace
 
+// You can also use db.createOne
 db.new({
   name: "Marcos",
   id: "001",
@@ -37,5 +36,5 @@ const doc = db.findOne({
   id: "001",
 }); // Returns the document
 
-console.log(doc?.name, doc?.id); // 'Marcos', '001'
+console.log(doc?.name, doc?.id); // 'Marcos' '001'
 ```
